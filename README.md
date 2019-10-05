@@ -184,7 +184,7 @@ Email: David.Sinclair@computing.dcu.ie
 
 - **Concatenation**: MN == a string _ab_ where _a_ is in _M_ **and** _b_ is in _N_.
 
-- **Epsilon**: denotes the empty string with e
+- **Epsilon**: denotes the empty string with ε
 
 - **Repitition**: the **_Kleene Closure_** of _M_ ( **M*** ) is the set of _zero or more concatenations_ of _M_.
 
@@ -362,9 +362,150 @@ Token manager produced by JavaCC provides one public method
     
     - this gets rid of alternation (except at top level)
 
+          expr = a b(c | d)e
+          becomes
+          aux = c
+          aux = d
+          expr = a b aux e
+
     - this gets rid of Kleene Closure
 
+          expr = (a b c)*
+          becomes
+          expr = (a b c) expr
+          expr = ε
+
     - .. **this becomes a Context Free Grammar**
+
+    ---
+
+## Context Free Grammers
+
+  A CFG _G_ is a 4-tuple (_Vt_, _Vt_, _S_, _P_)
+
+  - _Vt_ is the set of **terminal** symbols in the grammar. (the set of tokens returned by the scanner.)
+
+    - a,b,c,...∈ _Vt_
+
+  - _Vn_ are the **nontermnals**, a set of syntactic variables that denote sets of (sub)strings occurring in the language. These impose a structure on the grammar
+
+    - A,B,C,...∈ _Vn_
+
+  - _S_ is a distinguished nonterminal denoting the **entire set of strings in _L(G)_**. A.K.A **goal symbol**
+
+  - _P_ is a finite **set of productions** specifying how terminals and nonterminals can be combined to form strings in the language. Each production _must have a single non-terminal on its left hand side_.
+
+  The set _V = Vt_ U _Vn_ is the **vocabulary** of G.
+
+  ### **Vocabulary**
+
+  - U, V, W,... ∈ _V_
+
+  - α, β, γ,... ∈ _V*_
+
+  - u, v, w,... ∈ _Vt*_
+
+  - **single-step derivation**: (if A -> γ), then αAβ **=>** αγβ is a s.s derivation using A -> γ
+
+    - **=>*** denotes derivation of 0+ steps; **=>+** denotes 1+ step derivation 
+
+  - **sentence of _G_**
+
+        L(G) = {w ∈ V*t|S =>+ w}, w ∈ L(G)
+
+        note
+        L(G) = {β ∈ V*|S =>* β} ∩ V*t
+
+  ### **Notation - Backus-Naur form**
+
+        1|<goal> ::= <expr>                       (non-terminals represented with <angle brackets>)
+        2|<expr> ::= <expr><op><expr>             (terminals with typewriter font or underline)
+        3|        |   num
+        4|        |   id                          (productions as shown to the left)
+        5|<op>   ::=  +
+        6|<op>   ::=  -
+        7|<op>   ::=  *
+        8|<op>   ::=  /
+
+
+  ### **Derivations**
+
+  A sequence of production applications, AKA _parse_
+
+  _Parsing_ is the **process of discovering a derivation for a statement**
+
+  - At each step, we _choose a nonterminal to replace_. This can lead to different derivations...
+
+    - **leftmost derivation**: the leftmost non-terminal is replaced at each step.
+
+    - **rightmost derivation**: the rightmost non-terminal is replaced at each step.
+
+  Can lead to discrepancies.... take sentence **x + 2*y** using the above grammar..
+
+      Leftmost Derivation                             Rightmost Derivation
+      <goal> => <expr>                                <goal> => <expr>
+             => <expr><op><expr>                             => <expr><op><expr>   
+             => <expr><op><expr><op><expr>                   => <expr><op><id,y>
+             => <id,x><op><expr><op><expr>                   => <expr>*<id,y> 
+             => <id,x>+<expr><op><expr>                      => <expr><op><expr>*<id,y>
+             => <id,x>+<num,2><op><expr>                     => <expr><op><num,2>*<id,y>
+             => <id,x>+<num,2>*<expr>                        => <expr>+<num,2>*<id,y> 
+             => <id,x>+<num,2>*<id,y>                        => <id,x>+<num,2>*<id,y>
+
+      ..<goal> =>* id + num*id in both cases, BUT structure induced is different
+
+      x + (2 * y) in parse tree             WHEREAS     (x + 2) * y in parse tree for R.most ...WRONG
+
+  ..need to add _precedence_ to add additional structure to the Grammar. Precedence lets the computer know _which route to take_
+
+      1|<goal>    ::= <expr>
+      2|<expr>    ::= <expr> + <term>            
+      3|           |  <expr> - <term>
+      4|           |  <term>                      (terms must be derived from expressions)       
+      5|<term>    ::= <term> * <factor> 
+      6|<term>    ::= <term> / <factor>
+      7|<term>    ::= <factor>                    (factors must be derived from terms)
+      8|<factor>  ::= num
+      9|           |  id  
+
+  By adding this extra structure, we **imply an evaluation order** and get the correct Tree.
+
+
+  ## Ambiguity
+
+  Grammar is **ambiguous** if a _sentence admits two or more derivations._
+
+  Two types of ambiguity; Context _free_ ambiguity and Context _sensitive_ ambiguity
+
+  - Context Free: 
+
+    - need to **rearrange the grammar** in order to eliminate this ambiguity
+
+            <stmt> ::= if <expr> then <stmt>                  
+                    |  if <expr> then <stmt> else <stmt>                 
+                    |  (other stmts)..   
+
+              - The sentece "if E1 then if E2 then S1 else S2" would have two derivations..                     
+            
+            <stmt>      ::= <matched>
+                         |  <unmatched>
+            <matched>   ::= if <expr> then <matched> else <matched>
+                         |  (other stmts)..
+            <unmatched> ::= if <expr> then <stmt>
+                         |  if <expr> then <matched> else <unmatched>
+
+              - this matches each "else" with the closest unmatched "then"
+
+
+  - Context Sensitive: 
+  
+    - arises from **overloadng**
+
+           a = f(17)          ...(in Algol-like languages), f could be a function OR a subscripted variable..
+
+    - disambiguating requires context.. need values of declarations, this is really an issue of type
+
+    - rather then complicate parsing, this type of ambiguity is handled separately..
 
 ---
 
