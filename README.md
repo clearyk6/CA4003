@@ -8,7 +8,7 @@ Phone: 5510
 
 Email: David.Sinclair@computing.dcu.ie
 
-### [Course web page](http://www.computing.dcu.ie/~davids/CA4003/CA4003.html)
+### [Course web page](https://www.computing.dcu.ie/~davids/teaching.shtml)
 
 ---
 
