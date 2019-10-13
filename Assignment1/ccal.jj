@@ -1,0 +1,146 @@
+/*******************************
+ ***** SECTION 1 - OPTIONS *****
+ *******************************/
+
+options {
+    JAVA_UNICODE_ESCAPE = true;
+    IGNORE_CASE = true;
+}
+
+/*********************************
+ ***** SECTION 2 - USER CODE *****
+ *********************************/
+ 
+PARSER_BEGIN(ccalParser)
+
+import java.util.*;
+
+public class ccalParser {
+    
+    public static void main(String[] args) {
+
+        // Initialise parser to read
+        ccalParser parser;
+        if (args.length == 0) {
+
+            System.out.println("Reading from standard input...");
+            parser = new ccalParser(System.in);
+
+        } else if (args.length == 1) {
+            System.out.println("Reading from file " + args[0] + "...");
+            try {
+                parser = new ccalParser(new java.io.FileInputStream(args[0]));
+            } catch (java.io.FileNotFoundException e) {
+                System.err.println("File " + args[0] + " not found.");
+                return;
+            }
+
+        } else {
+
+            System.out.println("ccal Parser: Usage is one of:");
+            System.out.println("    java ccalParser < inputfile");
+            System.out.println("OR");
+            System.out.println("    java ccalParser inputfile");
+            return;
+        }
+
+    // Parse the file
+    try {
+        parser.program();
+        System.out.println("CCAL program parsed successfully.");
+    } catch (ParseException e) {
+        System.out.println(e.getMessage());
+        System.out.println("Encountered errors during parse.");
+        }
+    }
+}
+
+PARSER_END(ccalParser)
+
+/*****************************************
+ ***** SECTION 3 - TOKEN DEFINITIONS *****
+ *****************************************/
+
+TOKEN_MGR_DECLS :
+{
+    static int commentNesting = 0;
+}
+
+ SKIP : /* IGNORING WHITESPACE */
+{
+    " "
+  | "\t"
+  | "\n"
+  | "\r"
+  | "\r\n"
+  | "\f"
+}
+
+SKIP :
+{
+    < "//" ([" "-"~"])* ("\n" | "\r" | "\r\n") >
+  | "/*" { commentNesting++; } : IN_COMMENT
+}
+
+<IN_COMMENT> SKIP :
+{
+    "/*" { commentNesting++; }
+  | "*/" { commentNesting--;
+            if (commentNesting ==0)
+                SwithTo(DEFUALT);
+         }
+  /* OTHER (UNKNOWN) CHARACTERS */
+  | < ~[] >
+}
+
+TOKEN : /* RESERVED KEYWORDS */
+{
+    < VARIABLE : "var" >
+  | < CONSTANT : "const" >
+  | < RETURN : "return" >
+  | < INTEGER : "integer" >
+  | < BOOLEAN : "boolean" >
+  | < VOID : "void" >
+  | < MAIN : "main" >
+  | < IF : "if" >
+  | < ELSE : "else" >
+  | < TRUE : "true" >
+  | < FALSE : "false" >
+  | < WHILE : "while" >
+  | < SKP : "skip" >
+}
+
+TOKEN : /* PUNCTUATION/OPERATOR TOKENS */
+{
+    < COMMA : "," >
+  | < SEMIC : ";" >
+  | < COLON : ":" >
+  | < ASSIGN : "=" >
+  | < LBRACE : "{" >
+  | < RBRACE : "}" >
+  | < LPAREN : "(" >
+  | < RPAREN : ")" >
+  | < PLUS : "+" >
+  | < MINUS : "-" >
+  | < NOT : "~" >
+  | < OR : "||" >
+  | < AND : "&&" >
+  | < EQUAL : "==" >
+  | < NOT_EQUAL : "!=" >
+  | < LESS_THAN : "<" >
+  | < LESS_THAN_EQUAL_TO : "<=" >
+  | < GREATER_THAN : ">" >
+  | < GREATER_THAN_EQUAL_TO : ">=" >
+}
+
+TOKEN : /* VALUES */
+{
+    < #DIGIT: ["0"-"9"] >
+  | < INT: (<MINUS>)?["1"-"9"](<DIGIT>)* >
+  | < #LETTER: ["a"-"z", "A"-"Z"] >
+  | < ID: <LETTER>(<LETTER>|<DIGIT>|"_")* >
+}
+
+/***********************************
+***** SECTION 4 - THE GRAMMAR *****
+***********************************/
