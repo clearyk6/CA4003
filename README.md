@@ -184,7 +184,7 @@ Email: David.Sinclair@computing.dcu.ie
 
 - **Concatenation**: MN == a string _ab_ where _a_ is in _M_ **and** _b_ is in _N_.
 
-- **Epsilon**: denotes the empty string with ε
+- **epsilon**: denotes the empty string with ε
 
 - **Repitition**: the **_Kleene Closure_** of _M_ ( **M*** ) is the set of _zero or more concatenations_ of _M_.
 
@@ -278,7 +278,7 @@ It's easier to convert RegEx to NFA, but we can _only build DFA_
 
 - ### **_epsilon_ - closure**(S)
 
-  - all the states that can be reached from state S **without consuming any symbols** (using _epsilon_ (ε) edges only)
+  - all the states that can be reached from state S **without consuming any symbols** (using _ε_ (epsilon) edges only)
 
 - ### **DFAedge**(d, c)
 
@@ -506,6 +506,143 @@ Token manager produced by JavaCC provides one public method
     - disambiguating requires context.. need values of declarations, this is really an issue of type
 
     - rather then complicate parsing, this type of ambiguity is handled separately..
+
+---
+
+## 3.1 Top Down Parsing
+
+Starts with the **root** of the parse tree labelled with the _goal symbol_ of the grammar. Repeats the following until **fringe of the parse tree matches the input string**:
+
+- At node label _A_ select a production _A_ -> _α_, and construct the appropriate child for each symbol of α.
+- When a terminal is added to the fringe that _doesn't match the input string, **backtrack**_.
+- Find the next node to be expanded (Must have a label in Vn)
+
+To avoid backtracking the parse should be guided with the input string.._choose the right rule @ the right time_
+
+**Top down parsers cannot handle left recursion** in a grammar
+
+- transform the grammar to remove left recursion
+     
+      A ::= Aα
+         |  β
+
+         becomes
+      
+      A  ::= βA'
+      A' ::= αA'
+         |   ε   
+
+         where A' is a new nonterminal. This is right-recursive
+
+**Lookahead** needed to _avoid backtracking_; if parser doesn't make right choices the expansion may terminate!
+
+We need arbitrary lookahead to parse a CFG, but a large no of subclasses of CFGs can be parsed with limited lookahead such as:
+
+- **LL(1):** Left to right scan, Left-most derivation, 1-token lookahead
+- **LR(2):** Left to right scan, Right-most derivation, 1-token lookahead 
+
+      1 <goal> ::= <expr>
+      2 <expr> ::= <term> <expr′>
+      3 <expr′> ::= + <expr>
+      4         | - <expr>
+      5         | ε
+      6 <term> ::= <factor> <term′>
+      7 <term′> ::= * <term>
+      8         | / <term>
+      9         | ε
+      10 <factor> ::= num
+      11         | id
+
+**Table Driven Parsing**: generate a **parse table**, then parsing code _remains the same across any language_.
+
+- Remove left recursion and left a
+- FIRST: (α); the **set of terminal symbols** that _begin strings derived from α._ 
+
+(XYZ -> d, in copy)
+
+  - {a element of Vt| α =>* aβ} 
+  - **if** α =>* ε, then ε element of FIRST(α)
+
+        note:  =>* means in zero or more steps
+
+- compute FIRST(X) for all grammar symbols X by doing the following:
+  - if X terminal, then FIRST(X) = {X}
+  - if X is a nonterminal and X -> Y1 Y2 Y3
+  - ...
+  - ...
+
+
+- FOLLOW(X): the set of terminals that can _immediately follow X_. 
+  - t element of FOLLOW(X) if tere is **any derivation containing _Xt_**. includes any derivation containing XYZt where Y and Z are nullable.
+
+- compute FOLLOW(A) for all nonterminals A by doing the following until nothing else can be dded to set:
+  - Place $ in FOLLOW(S) where S is the start symbol and $ is the end of input marker
+  - if there is a prod rule _A -> αBβ_, then everything in FIRST(β), except ε, is in FOLLOW(B).
+  - if there is a prod rule _A -> αB_, or a prod rule _A -> αBβ_ where FIRST(β) contains ε everything in FOLLOW(A) in FOLLOW(B)
+
+**note**: if symbol Y can tranform to ε, then Y is a **nullable symbol**.
+
+- LOOKAHEAD(A -> α): set of terminals which can appear next in the input if we want to recognise the rule A -> α
+- to build LOOKAHEAD(A -> α):
+
+  - Put FIRST(α) (less {ε}) in LOOKAHEAD(A -> α).
+  - if ε is element of FIRST(α) then put FOLLOW(A) in LOOKAHEAD(A -> α)
+
+### LL(1) Grammars
+
+A grammar G is **LL(1)** if for each set of productions A -> α1|α2|...|αn
+
+- LOOKAHEAD(A -> α), LOOKAHEAD(A -> α2),..., LOOKAHEAD(A -> αn) are all _pairwise disjoint_.
+- if more than one entry then G is not LL(1).
+
+Facts about LL(1)s:
+
+- No left-recursive grammar is LL(1)
+- No ambiguous grammar is LL(1)
+- Some languages have no LL(1) grammar
+- An ε-free grammar where _each alternate expansion for A begins with a **disinct** terminal_ is a **simple LL(1) grammar**
+
+### Building the AST
+
+Insert code at the right points...
+
+      tos = 0
+      Stack[tos] = EOF
+      Stack[++tos] = root node
+      Stack[++tos] = Start Symbol
+      token = next token()
+      repeat
+        X = Stack[tos]
+        if X is a terminal or EOF then
+          if X == token then
+            pop X
+            token = next token()
+              //pop and fill in node
+          else error()
+        else /* X is a non-terminal */
+          if M[X,token] == X → Y1Y2...Yk then
+            pop X
+              // pop node for X
+              // build node for each child and
+              // make it a child of node for X
+            push {nk , Yk , nk−1, Yk−1, ..., n1, Y1}
+          else error() 
+      until X == EOF
+
+**Error Recovery**: for each non-terminal, construct a set of terminals on which the parser can _synchronize_
+- When an error occurs looking for A, scan until an element of SYNCH(A) is found
+- building SYNCH(A):
+  - a element of FOLLOW(A) => a element SYNCH(A)
+  - place keywords that start that start statements in SYNCH(A)
+  - add symbols in FIRST(A) to SYNCH(A)
+- (if we can't match a terminal on top of the stack..)
+  - pop the terminal
+  - print a message saying terminal was inserted
+  - continue the parse
+
+To fix conflict between picking two rules..
+- if something goes to something and somthing goes to nothing, pick the **someting** to something rule.
+- if both go to something then you gotta choose between the two.
 
 ---
 
