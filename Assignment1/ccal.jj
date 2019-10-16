@@ -107,7 +107,7 @@ TOKEN : /* RESERVED KEYWORDS */
   | < TRUE : "true" >
   | < FALSE : "false" >
   | < WHILE : "while" >
-  | < SKP : "skip" >
+  | < SKIP_T : "skip" >
 }
 
 TOKEN : /* PUNCTUATION/OPERATOR TOKENS */
@@ -144,3 +144,94 @@ TOKEN : /* VALUES */
 /***********************************
 ***** SECTION 4 - THE GRAMMAR *****
 ***********************************/
+
+void program() : {} {
+    declList() functionList() main()
+}
+
+void declList() : {} {
+    (decl() <SEMIC> declList())?
+}
+
+void decl() : {} {
+    varDecl() | constDecl()
+}
+
+void varDecl() : {} {
+    <VARIABLE> <ID> <COLON> type()
+}
+
+void type() : {} {
+    <INTEGER> | <BOOLEAN> | <VOID>
+}
+
+void constDecl() : {} {
+    <CONSTANT> <ID> <COLON> type() <ASSIGN> expression()
+}
+
+void expression() : {} {
+    fragment() binaryArithOp() fragment() |
+    <LPAREN> expression() <RPAREN> |
+    <ID> <LPAREN> argList() <RPAREN> |
+    fragment()
+}
+
+void fragment() : {} {
+    <ID> | <MINUS> <ID> | <INTEGER> | <TRUE> | <FALSE> | expression()
+}
+
+void binaryArithOp() : {} {
+    <PLUS> | <MINUS>
+}
+
+void argList() : {} {
+    (nempArgList())?
+}
+
+void nempArgList() : {} {
+    <ID> | <ID> <COMMA> nempArgList()
+}
+
+void functionList() : {} {
+    <LPAREN> (function() functionList())? <RPAREN>
+}
+
+void function() : {} {
+    type() <ID> <LPAREN> parameterList() <RPAREN>
+    <LBRACE>
+    declList()
+    statementBlock()
+    <RETURN> <LPAREN> (expression())? <RPAREN> <SEMIC>
+    <RBRACE>
+}
+
+void parameterList() : {} {
+    (nempParameterList())?
+}
+
+void nempParameterList() : {} {
+    <ID> <SEMIC> type() | <ID> <SEMIC> type() <COMMA> nempParameterList()
+}
+
+void statementBlock() : {} {
+    (statement() statementBlock())?
+}
+
+void statement() : {} {
+    <ID> <ASSIGN> expression()  <SEMIC> |
+    <ID> <LPAREN> argList() <RPAREN> <SEMIC> |
+    <LBRACE> statementBlock() <RPAREN> |
+    <IF> condition() <LBRACE> statementBlock() <RBRACE> <ELSE> <LBRACE> statementBlock() <RBRACE> |
+    <WHILE> condition() <LBRACE> statementBlock() <RBRACE> |
+    <SKIP_T>
+}
+
+void condition() : {} {
+    <NOT> condition() | <LPAREN> condition() <RPAREN> |
+    expression() compOp() expression() |
+    condition() (<OR> | <AND>) condition()
+}
+
+void compOp() : {} {
+    <EQUAL> | <NOT_EQUAL> | <LESS_THAN> | <LESS_THAN_EQUAL_TO> | <GREATER_THAN> | <GREATER_THAN_EQUAL_TO>
+}
