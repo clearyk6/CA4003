@@ -7,25 +7,23 @@ options {
     IGNORE_CASE = true;
 }
 
+
 /*********************************
  ***** SECTION 2 - USER CODE *****
  *********************************/
  
-PARSER_BEGIN(ccalParser)
+PARSER_BEGIN(CCALParser)
 
-import java.util.*;
-
-public class ccalParser {
+public class CCALParser {
     
     public static void main(String[] args) {
 
         // Initialise parser to read
         ccalParser parser;
-        if (args.length == 0) {
 
+        if (args.length == 0) {
             System.out.println("Reading from standard input...");
             parser = new ccalParser(System.in);
-
         } else if (args.length == 1) {
             System.out.println("Reading from file " + args[0] + "...");
             try {
@@ -34,9 +32,7 @@ public class ccalParser {
                 System.err.println("File " + args[0] + " not found.");
                 return;
             }
-
         } else {
-
             System.out.println("ccal Parser: Usage is one of:");
             System.out.println("    java ccalParser < inputfile");
             System.out.println("OR");
@@ -55,7 +51,8 @@ public class ccalParser {
     }
 }
 
-PARSER_END(ccalParser)
+PARSER_END(CCALParser)
+
 
 /*****************************************
  ***** SECTION 3 - TOKEN DEFINITIONS *****
@@ -136,17 +133,18 @@ TOKEN : /* PUNCTUATION/OPERATOR TOKENS */
 TOKEN : /* VALUES */
 {
     < #DIGIT: ["0"-"9"] >
-  | < INT: (<MINUS>)?["1"-"9"](<DIGIT>)* >
+  | < INT: (<MINUS>)?["1"-"9"](<DIGIT>)* | "0" >
   | < #LETTER: ["a"-"z", "A"-"Z"] >
   | < ID: <LETTER>(<LETTER>|<DIGIT>|"_")* >
 }
+
 
 /***********************************
 ***** SECTION 4 - THE GRAMMAR *****
 ***********************************/
 
 void program() : {} {
-    declList() functionList() main()
+    declList() functionList() main() <EOF>
 }
 
 void declList() : {} {
@@ -169,15 +167,12 @@ void constDecl() : {} {
     <CONSTANT> <ID> <COLON> type() <ASSIGN> expression()
 }
 
+/*Proposed solution to left recursion (delete fragment nonterminal completely)*/
+
 void expression() : {} {
-    fragment() binaryArithOp() fragment() |
     <LPAREN> expression() <RPAREN> |
     <ID> <LPAREN> argList() <RPAREN> |
-    fragment()
-}
-
-void fragment() : {} {
-    <ID> | <MINUS> <ID> | <INTEGER> | <TRUE> | <FALSE> | expression()
+    (<ID> | <MINUS> <ID> | <INTEGER> | <TRUE> | <FALSE>) (binaryArithOp() expression())?
 }
 
 void binaryArithOp() : {} {
@@ -210,7 +205,7 @@ void parameterList() : {} {
 }
 
 void nempParameterList() : {} {
-    <ID> <SEMIC> type() | <ID> <SEMIC> type() <COMMA> nempParameterList()
+    <ID> <COLON> type() (<COMMA> <ID> <COLON> type())*
 }
 
 void statementBlock() : {} {
@@ -220,10 +215,10 @@ void statementBlock() : {} {
 void statement() : {} {
     <ID> <ASSIGN> expression()  <SEMIC> |
     <ID> <LPAREN> argList() <RPAREN> <SEMIC> |
-    <LBRACE> statementBlock() <RPAREN> |
+    <LBRACE> statementBlock() <RBRACE> |
     <IF> condition() <LBRACE> statementBlock() <RBRACE> <ELSE> <LBRACE> statementBlock() <RBRACE> |
     <WHILE> condition() <LBRACE> statementBlock() <RBRACE> |
-    <SKIP_T>
+    <SKIP_T> <SEMIC>
 }
 
 void condition() : {} {
@@ -234,4 +229,11 @@ void condition() : {} {
 
 void compOp() : {} {
     <EQUAL> | <NOT_EQUAL> | <LESS_THAN> | <LESS_THAN_EQUAL_TO> | <GREATER_THAN> | <GREATER_THAN_EQUAL_TO>
+}
+
+void main() : {} {
+    <MAIN> <LBRACE>
+    declList()
+    statementBlock()
+    <RBRACE>
 }
