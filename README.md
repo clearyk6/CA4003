@@ -350,6 +350,10 @@ Token manager produced by JavaCC provides one public method
 
 - returns the next available token in the input stream and moves the pointer one step in the input stream
 
+- **important**: two important attributes of any token
+  - kind: the kind of token as specified in token manager
+  - image: the _lexeme_ associated with that token
+
 ---
 
 # 3. Parsing
@@ -646,6 +650,149 @@ To fix conflict between picking two rules..
 
 ---
 
+## 3.2 Bottom Up Parsing
+
+LL(k) parsers: left to right parse, leftmost derivation using _k_ token lookahead, Must predict which production rule to use having seen the first k tokens of the right hand side.
+
+More powerful to use **LR(_k_)** parsing; left to right parse, _rightmost derivation_, k token lookahead. Many a programming language requires an LR(1) grammar and parser.
+
+- LR(1) is the norm since k > 1 generates lots of internal states. SableCC, Yacc and Bison all support LR grammars.
+
+### LR Parse Engine
+
+Has a **stack** and an**input**. First _k_ tokens of the input are the _lookahead_.
+
+LR engine shifts tokens from the input to the stack, and when the tokens on top of the stack match the righthand-side of a production rule, pop the tokens off the stack and push the lefthand-side of the production rule onto the stack.
+
+- if the stack contains ABC and there is a production rule X -> ABC, then pop C, B and A and push X onto th stack.
+- Stack is initially empty and when the parser shifts the end-of-file marker, $, and the input has a valid derivation; parser enters the accepting state. Otherwise parser ends in an error state.
+
+**Valid actions of an LR Parse Engine**
+
+- **shift(n)** Advance input by 1 token and push state n onto the stack.
+- **reduce(k)** Pop of the number of symbols on the right hand side of rule k.
+  - Let X be the lefthand side of rule k. In the state now on top of the stack, look up X in the state table to get "goto n". Push state n onto the stack.
+- **accept** Stop parsing and report success
+- **error** Stop parsing and report failure.
+
+**State Table**: a two dimensional table - States x Symbols.
+
+- Each entry contains an action. Implemented as a DFA
+
+  - DFA not powerful enough to parse a context-free grammar, but can manage the stack in the LR parse engine.
+  - the edges of the DFA are the symbols and the states represent the stack.
+
+### LR(0) Parsing
+
+> insert initial notes
+
+Initially have an empty stack, input will have a
+complete **sentence S** followed by the **end-of-input marker, $**. 
+
+We denote this as:
+
+    S′ → .S$
+
+where the **dot indicates the _current parser position_**.
+
+**LR(0) item:** A production rule combined with a parser position, dot ('.')
+
+In this state, an input that can be parsed not only begins with S
+but also with any any possible right-hand side of an S-production.
+
+**State**: Set of LR(0) items, visually represented as a list of items in a box with State number label.
+
+**Shift actions**: If we shift an x is state 1, only the second production rule is affected. We can ignore the other rules.
+
+The effect of shifting an x symbol will be to _move the dot past the x_. This will give us a **new state**.
+
+
+Build **State Diagram** first
+- be mechanical and meticulous and this won't fail
+
+Then build **Parsing Table**
+
+Conflicts...
+
+- **Shift reduce**
+- **Reduce reduce**
+
+### SLR Parsers
+
+"Simple LR", but more powerful than LR(0)
+
+Like LR(0) parsers, but generation of reduce actions depends on the FOLLOW() set.
+
+- have fewer reduce actions than LR(0)
+
+### LR(1) Parsers
+
+More powerful than LR(0) and SLR language.
+
+- **Most programming languages** parsed by an LR(1) Parser.
+
+Algorithm similar to LR(0), exceot:
+
+- concept of an _item_ in LR(1) is expanded to a **lookahead symbol**
+- LR(1) item is (A -> α.Beta,x), where x = lookahead symbol.
+  - sequence α is on top of stack
+  - input starts with a string that can be derived from Betax
+- LR(1) state a set of LR(1) items that are constructed using versions of Closure and Goto that incorporate the lookahead symbol.
+
+To build Parsing Table once the Sate Diagram has been generaterd...
+
+- if dot is at the end of a production rule, then **reduce** action placed in Parsing table in the corresponding column to lookahead symbol.
+- If the dot is to the left of a _terminal_ or _non-terminal_ symbol, the corresponding column for that state contains a _shift_ or _goto action respectively_ (same as with an LR(0) table)
+
+
+LR(1) can have maaany states - COBOL-85 has  > 2,000,000!
+
+- Therefore a _lookahead LR(1) parser_ (**LALR(1)**) can be used to merge states that differ by their lookahead sets - reducing no. of states
+- Brings COBOL-85's states down to < 2,000
+- Check which states can be merged from the LR(1) diagram, if available.
+- Create parse table based on the merge states.
+- LALR(1) parsing tables are at risk of reduce-reduce conflicts where LR(1) parsers may not..
+
+### If Then Else statements
+
+Tend to give rise to shift-reduce errors..
+
+- **shift** gives one interpretation - _if a then {if b then s1 else s2}_ (more common)
+- **reduce** gives a different interpretation - _if a then {if b then s1} else s2_
+
+.. better way to deal is to introduce non-terminals to identify Matched and Unmatched statements (this arises from [**ambiguity**](##Ambiguity))
+
+Some Compiler generators (Yacc, Bison) have **precedence directives** for _assisting the resolvement of shift-reduce conflict_.
+
+- can make items _right associative_, _left associative_ or _non-associative_
+- definitions of precedence in Yacc:
+       
+      precedence nonassoc EQ, NEQ;
+      precedence left PLUS, MINUS;
+      precedence left TIMES, DIV;
+      precedence right EXP;
+
+      /*Order of appearance is order of precedence*/
+
+### Recursion: left vs right
+
+Right Recursion:
+- Needed for _termination in predictive parsers_.
+- Requires more stack space.
+- Gives rise to right associative operators.
+
+Left Recursion:
+- Works fine in bottom-up parsers.
+- _Limits the required stack space._
+- Gives rise to left associative operators.
+- Causes a top-down parser to crash... see LL(0) left recursion handling [here](##3.1-Top-Down-Parsing)
+
+Rule of thumb:
+- **Right recursion for top-down parsers.**
+- **Left recursion for bottom-up parsers.**
+
+---
+
 # 4. Syntax Analysis
 
 ## Goal of S.A is to _combine the tokens generated by the L.A_ into a valid **"sentence"**
@@ -664,13 +811,53 @@ To fix conflict between picking two rules..
 
   - _Checks the source program_ for **semantic errors**, gathers **type information** for the Intermediate Code Generation phase
 
+  - Does something useful given the parsed sentence
+
+    - e.g expression z = x + 2 & y is _Syntactically correct_ but is not semantiacally understandable.
+
   - "What if answer and y are integers and x is a float??"
 
 - ### **In an interpreter**
 
   - _Evaluates the source program_ stored in the Abstract Syntax Tree
 
-  ---
+---
+
+## Semantic Actions
+
+Semantic actions of a parser perform useful operations:
+- Build an abstract parse tree
+- type check
+- evaluation/begin translation, depending on interpreter/compiler
+
+In some compiler constructors eg JavaCC, semantic actions are attached to production rules.
+
+In JJTree, syntax tree is automatically generated.
+
+Each symbol, terminal or non-terminal has it's own type of **semantic value** (semantic type)
+
+A rule W -> XYZ **must** return a semantic type associated with the symbol W, but may use values associated with all RHS symbols
+
+**Parse Tree** is a data structure used to separate parsing from semantics.
+
+Possible to write a compiler so that everything is done by semantic action of the parsing phase, **but**
+
+- constrains the compiler to analyse the input _exactly in the order in which it is parsed_
+- it becomes v v difficult to remain.
+
+**Concrete parse tree**: Exactly one terminal node for each token in the input, one internal node for each production rules used in Parse.
+
+- great as educational tool, but contain a lot of redundant info, useless info for semantic analysis.
+
+**Abstract Syntax Tree**: a _clean interface_ between parsing and semantic analysis/later phases. Removes all redundant info. Captures the _phase structure_ of the input.
+
+In a single pass compiler where lexical analysis, parsing and semantic analysis are all done simultaneously, then the current position of the lexical analyser is a reasonable approximation of the source of the error
+
+In a multi-pass compiler using an AST, the current position of the lexical analyser is EOF, and so is not useful if we find an error during semantic analysis.
+
+- we need to extend the data structures used in the AST to include a **pos** field that indicates the position, in the original source file, of the characters from which the abstract syntax structures were derived. Need to include this in Scanner too to include line and column numbers.
+
+---
 
 # 6. Intermediate Code Generation
 

@@ -68,6 +68,7 @@ Lexical Analyser:
             }
         }
     }
+    }
     
     PARSER_END(SLPTokeniser)
 
