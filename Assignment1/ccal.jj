@@ -183,12 +183,12 @@ void argList() : {} {
 }
 
 /* Add left factoring into nempArgList to achieve LL(1) */
-void nempArgListBase() : {} {
-    <ID> nempArgList()
+void nempArgList() : {} {
+    <ID> nempArgListA()
 }
 
-void nempArgList() : {} {
-    (<COMMA> nempArgListBase())?
+void nempArgListA() : {} {
+    (<COMMA> nempArgList())?
 }
 
 void functionList() : {} {
