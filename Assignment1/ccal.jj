@@ -167,8 +167,7 @@ void constDecl() : {} {
     <CONSTANT> <ID> <COLON> type() <ASSIGN> expression()
 }
 
-/*Proposed solution to left recursion (delete fragment nonterminal completely)*/
-
+/* Removal of left recursion in expression - deleted fragment nonterminal completely */
 void expression() : {} {
     <LPAREN> expression() <RPAREN> |
     <ID> <LPAREN> argList() <RPAREN> |
@@ -183,8 +182,13 @@ void argList() : {} {
     (nempArgList())?
 }
 
+/* Add left factoring into nempArgList to achieve LL(1) */
+void nempArgListBase() : {} {
+    <ID> nempArgList()
+}
+
 void nempArgList() : {} {
-    <ID> | <ID> <COMMA> nempArgList()
+    (<COMMA> nempArgListBase())?
 }
 
 void functionList() : {} {
@@ -212,13 +216,18 @@ void statementBlock() : {} {
     (statement() statementBlock())?
 }
 
+/* left-factoring implemented for statement to achieve LL(1) */
 void statement() : {} {
-    <ID> <ASSIGN> expression()  <SEMIC> |
-    <ID> <LPAREN> argList() <RPAREN> <SEMIC> |
+    <ID> statementWithId() |
     <LBRACE> statementBlock() <RBRACE> |
     <IF> condition() <LBRACE> statementBlock() <RBRACE> <ELSE> <LBRACE> statementBlock() <RBRACE> |
     <WHILE> condition() <LBRACE> statementBlock() <RBRACE> |
     <SKIP_T> <SEMIC>
+}
+
+void statementWithId() : {} {
+    <ASSIGN> expression() <SEMIC> |
+    <LPAREN> argList() <RPAREN> <SEMIC>
 }
 
 void condition() : {} {
