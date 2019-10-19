@@ -1,3 +1,5 @@
+/**Structure and Basis for section 2 taken from CA4003 Module notes on JavaCC**/
+
 /*******************************
  ***** SECTION 1 - OPTIONS *****
  *******************************/
@@ -33,10 +35,10 @@ public class CCALParser {
                 return;
             }
         } else {
-            System.out.println("ccal Parser: Usage is one of:");
-            System.out.println("    java ccalParser < inputfile");
+            System.out.println("CCAL Parser: Usage is one of:");
+            System.out.println("    java CCALParser < inputfile");
             System.out.println("OR");
-            System.out.println("    java ccalParser inputfile");
+            System.out.println("    java CCALParser inputfile");
             return;
         }
 
@@ -167,11 +169,20 @@ void constDecl() : {} {
     <CONSTANT> <ID> <COLON> type() <ASSIGN> expression()
 }
 
-/* Removal of left recursion in expression - deleted fragment nonterminal completely */
+/* Removal of left recursion in expression - deleted fragment nonterminal completely - add in left association */
 void expression() : {} {
-    <LPAREN> expression() <RPAREN> |
-    <ID> <LPAREN> argList() <RPAREN> |
-    (<ID> | <MINUS> <ID> | <INTEGER> | <TRUE> | <FALSE>) (binaryArithOp() expression())?
+    <LPAREN> expression() <RPAREN>
+  | expressionSimple()
+}
+
+void expressionSimple() : {} {
+    <ID> expressionWithId()
+  | (<MINUS> <ID> | <INTEGER> | <TRUE> | <FALSE>) (binaryArithOp() expression())?
+}
+
+void expressionWithId() : {} {
+    <LPAREN> argList() <RPAREN>
+  | (binaryArithOp() expression())?
 }
 
 void binaryArithOp() : {} {
@@ -192,7 +203,7 @@ void nempArgListA() : {} {
 }
 
 void functionList() : {} {
-    <LPAREN> (function() functionList())? <RPAREN>
+    (function() functionList())?
 }
 
 void function() : {} {
@@ -218,22 +229,32 @@ void statementBlock() : {} {
 
 /* left-factoring implemented for statement to achieve LL(1) */
 void statement() : {} {
-    <ID> statementWithId() |
-    <LBRACE> statementBlock() <RBRACE> |
-    <IF> condition() <LBRACE> statementBlock() <RBRACE> <ELSE> <LBRACE> statementBlock() <RBRACE> |
-    <WHILE> condition() <LBRACE> statementBlock() <RBRACE> |
-    <SKIP_T> <SEMIC>
+    <ID> statementWithId()
+  | <LBRACE> statementBlock() <RBRACE>
+  | <IF> condition() <LBRACE> statementBlock() <RBRACE> <ELSE> <LBRACE> statementBlock() <RBRACE>
+  | <WHILE> condition() <LBRACE> statementBlock() <RBRACE>
+  | <SKIP_T> <SEMIC>
 }
 
 void statementWithId() : {} {
-    <ASSIGN> expression() <SEMIC> |
-    <LPAREN> argList() <RPAREN> <SEMIC>
+    <ASSIGN> expression() <SEMIC>
+  | <LPAREN> argList() <RPAREN> <SEMIC>
 }
 
+/* Removed choice conflict between FIRST(condition()) and FIRST(expression()) containing "(" */
+/* Removed left recursion occuring by seperating into Condition() and ConditionA() */
 void condition() : {} {
-    <NOT> condition() | <LPAREN> condition() <RPAREN> |
-    expression() compOp() expression() |
-    condition() (<OR> | <AND>) condition()
+    <NOT> condition() conditionA()
+  | <LPAREN> condition() <RPAREN> conditionA()
+  | expressionSimple() compOp() expression() conditionA()
+}
+
+void conditionA() : {} {
+    orAnd() condition() conditionA() | {}
+}
+
+void orAnd() : {} {
+    <OR> | <AND>
 }
 
 void compOp() : {} {

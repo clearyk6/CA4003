@@ -10,6 +10,8 @@ Email: David.Sinclair@computing.dcu.ie
 
 ### [Course web page](https://www.computing.dcu.ie/~davids/teaching.shtml)
 
+    java -cp C:\JavaCC\javacc-6.0\bin\lib\javacc.jar javacc
+
 ---
 
 # Module Overview
