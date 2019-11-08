@@ -832,32 +832,130 @@ Semantic actions of a parser perform useful operations:
 - type check
 - evaluation/begin translation, depending on interpreter/compiler
 
-In some compiler constructors eg JavaCC, semantic actions are attached to production rules.
+In some compiler constructors eg. JavaCC, semantic actions are _attached to production rules_.
 
-In JJTree, syntax tree is automatically generated.
+In JJTree, syntax tree is _automatically generated_.
 
 Each symbol, terminal or non-terminal has it's own type of **semantic value** (semantic type)
 
-A rule W -> XYZ **must** return a semantic type associated with the symbol W, but may use values associated with all RHS symbols
+A rule W -> XYZ **must** return a semantic type associated with the symbol W, but _may_ use values associated with all RHS symbols
 
 **Parse Tree** is a data structure used to separate parsing from semantics.
 
 Possible to write a compiler so that everything is done by semantic action of the parsing phase, **but**
 
 - constrains the compiler to analyse the input _exactly in the order in which it is parsed_
-- it becomes v v difficult to remain.
+- it becomes v v difficult to maintain.
 
-**Concrete parse tree**: Exactly one terminal node for each token in the input, one internal node for each production rules used in Parse.
+**Concrete parse tree**: Exactly **one** terminal node for each token in the input, one internal node for each production rules used in Parse.
 
-- great as educational tool, but contain a lot of redundant info, useless info for semantic analysis.
+- great as educational tool, but contain a lot of redundant info, useless info for semantic analysis. (punctuation and operator tokens)
 
-**Abstract Syntax Tree**: a _clean interface_ between parsing and semantic analysis/later phases. Removes all redundant info. Captures the _phase structure_ of the input.
+**Abstract Syntax Tree**: a _clean interface_ between parsing and semantic analysis/later phases of compilation. Removes all redundant info. Captures the _phase structure_ of the input.
 
-In a single pass compiler where lexical analysis, parsing and semantic analysis are all done simultaneously, then the current position of the lexical analyser is a reasonable approximation of the source of the error
+In a **single pass compiler** where lexical analysis, parsing and semantic analysis are _all done simultaneously_, then the current position of the lexical analyser is a reasonable approximation of the source of the error
 
-In a multi-pass compiler using an AST, the current position of the lexical analyser is EOF, and so is not useful if we find an error during semantic analysis.
+In a **multi-pass compiler** using an AST, the current position of the lexical analyser is EOF, and so is not useful if we find an error during semantic analysis.
 
 - we need to extend the data structures used in the AST to include a **pos** field that indicates the position, in the original source file, of the characters from which the abstract syntax structures were derived. Need to include this in Scanner too to include line and column numbers.
+
+  ---
+
+Style of programming affects **modularity** of the code
+
+- **Object Oriented** style of programming involves use of an _eval_ method
+  - each interpretation is a method in the class that defined the **kind**.
+  - adding a kind is just adding a new class with a method of each interpretation
+  - adding a new interpretation means editing each class that represents a kind.
+  - useful for _GUIs_ where the number/type of objects tend to change & the operations on them do not.
+
+- **Syntax seperate from interpretation** is a different style, seperates the processing of ASTs from creating/definition of the ASTs.
+  - method written for each interpretation with clauses for each kind.
+  - interpretations are gathered together
+  - Adding a new interpretation means adding a new method
+  - Adding a new kind means editing _all_ the methods that represent interpretations
+  - Better for _compilers_, makes more sense to fix the syntax and then provide different interpretations.
+
+**Visitor Pattern** - used to avoid using the _instanceof_ operator and having each interpretation method looking like a _morass of clauses_..
+
+- a **visitor** implements an interpretation. Contains a method for ech kind (i.e each _class of syntax tree node_)
+- each syntax tree class has an _accept_ method that is called by the Visitor
+- _accept_ method acts as a hook for _all_ interpretations.
+- _accept_ method's only task is to call the visitor, parameterised by the _accept_ method's own type. Ensures the correct visitor method is invoked
+
+  ---
+
+### Symbol Tables
+
+A.K.A **environment**
+
+Maps identifiers to their types and locations.
+
+As types, variables and functions are declared, they are added to this symbol table.
+
+When an identifier is used, it is looked up in the symbol table.
+
+Identifiers in modern languages tend to have **scopes** in which they are visible
+
+**Environments** are a _set of bindings_
+
+- _a → x_ denotes that _a_ is bound to _x_.
+- σ0 = {g → string, a → int} denotes environment σ0 where _g_ is a string variable and _a_ is an integer variable.
+
+A **hash table** with _external chaining_ and an **undo stack** can:
+- give precedence where two or more environments contain different bindings for the same symbol.
+- make sure we find correct binding
+- allow us to efficiently discard environments
+
+**Hash Table**
+- hash function converts the symbole into an index in a table/array. SHou.d be capable of being evaluated quickly. Resulting indices should be randomly distributed across the table so it is unlikely two diff symbols will result in the same hash value.
+- Each enty in hash table is a linked list of bindings..
+  - when a binding is added, it is inserted at the _front_ of the linked list associated with the symbol's hash value.
+  - when looking up a symbol in hash table, the linked list associated with the symbol's hash value is searched from th front, finding the most recent binding that involves that symbol.
+  - Move a symbol successfully searched for to the front of the list to improve lookup time and make use of locality.
+
+**Undo Stack**
+- Whenever binding is added to Symbol Table, it is also pushed onto the undo stack
+- when a new scope is created (eg by the '{' symbol in Java), a special marker is placed onto the undo stack
+- When a scope is being destroyed (by '}'), entries on the undo stack are popped off and removed from the symbol table _until the special marker is popped off the undo stack_.
+
+Symbol table bindings associate names with attributes.
+
+- **variables**: type, procedure level, frame, offset
+- **types**: type descriptor, data size/alignment
+- **constants**: type, value
+- **procedures**: formals (names/types), result type, block information, frame size
+
+  ---
+
+### Type Checking
+
+One of the major semantic analysis operations
+
+Type expressions are _textual representations_ for types:
+
+- basic types: boolean, char, int, real
+- type names
+- constructed types...constructors applied to type expressions
+  - arrays
+  - products
+  - records
+  - pointers
+  - functions
+
+Type checking needs to determine **type equivalence**, two approaches:
+
+
+- **Name equivalence**: each type name is a distict type
+- **Structural equivalence**: two types equivalent if they have the same structure (after substituting type expressions for type names)
+
+Most languages have _type overloading_
+- can be resolved at compile-time by _type inference_, usually done bottom up. If f can be either int -> int or float -> float.. then f(42) has only one valid type, int!
+
+**Polymorphic Functions**
+- Ad-hoc polymorphism: on a case by case basis
+- Parametric polymorphism: can take a type as an argument
+  - often combined with type inference
 
 ---
 
