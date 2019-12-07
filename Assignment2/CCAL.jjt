@@ -1,0 +1,113 @@
+/*******************************
+ ***** SECTION 1 - OPTIONS *****
+ *******************************/
+
+options
+{
+    IGNORE_CASE = false;
+    MULTI=true;
+    VISITOR = true;
+}
+
+/*********************************
+ ***** SECTION 2 - USER CODE *****
+ *********************************/
+
+PARSER_BEGIN(CCALLang)
+
+public class CCALLang {
+    public static void main(String[] args) {
+
+    }
+
+}
+
+PARSER_END(CCALLang)
+
+/*************************************
+ ***** SECTION 3 - TOKEN MANAGER *****
+ *************************************/
+
+TOKEN_MGR_DECLS :
+{
+    static int commentNesting = 0;
+}
+
+SKIP : /* IGNORING WHITESPACE */
+{
+      " "
+    | "\t"
+    | "\n"
+    | "\r"
+    | "\r\n"
+    | "\f"
+}
+
+SKIP :
+{
+      < "//" ([" "-"~"])* ("\n" | "\r" | "\r\n") >
+    | "/*" { commentNesting++; } : IN_COMMENT
+}
+
+<IN_COMMENT> SKIP :
+{
+      "/*" { commentNesting++; }
+    | "*/" { commentNesting--;
+    if (commentNesting ==0)
+        SwithTo(DEFUALT);
+    }
+    /* OTHER (UNKNOWN) CHARACTERS */
+    | < ~[] >
+}
+
+TOKEN : /* RESERVED KEYWORDS */
+{
+      < VARIABLE : "var" >
+    | < CONSTANT : "const" >
+    | < RETURN : "return" >
+    | < INTEGER : "integer" >
+    | < BOOLEAN : "boolean" >
+    | < VOID : "void" >
+    | < MAIN : "main" >
+    | < IF : "if" >
+    | < ELSE : "else" >
+    | < TRUE : "true" >
+    | < FALSE : "false" >
+    | < WHILE : "while" >
+    | < SKIP_T : "skip" >
+}
+
+TOKEN : /* PUNCTUATION/OPERATOR TOKENS */
+{
+      < COMMA : "," >
+    | < SEMIC : ";" >
+    | < COLON : ":" >
+    | < ASSIGN : "=" >
+    | < LBRACE : "{" >
+    | < RBRACE : "}" >
+    | < LPAREN : "(" >
+    | < RPAREN : ")" >
+    | < PLUS : "+" >
+    | < MINUS : "-" >
+    | < NOT : "~" >
+    | < OR : "||" >
+    | < AND : "&&" >
+    | < EQUAL : "==" >
+    | < NOT_EQUAL : "!=" >
+    | < LESS_THAN : "<" >
+    | < LESS_THAN_EQUAL_TO : "<=" >
+    | < GREATER_THAN : ">" >
+    | < GREATER_THAN_EQUAL_TO : ">=" >
+}
+
+TOKEN : /* VALUES */
+{
+ < #DIGIT: ["0"-"9"] >
+| < INT: (<MINUS>)?["1"-"9"](<DIGIT>)* | "0" >
+| < #LETTER: ["a"-"z", "A"-"Z"] >
+| < ID: <LETTER>(<LETTER>|<DIGIT>|"_")* >
+}
+
+/****************************************************
+ ***** SECTION 4 - GRAMMAR AND PRODUCTION RULES *****
+ ***************************************************/
