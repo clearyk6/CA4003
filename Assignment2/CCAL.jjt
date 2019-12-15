@@ -4,9 +4,11 @@
 
 options
 {
-    IGNORE_CASE = false;
-    MULTI=true;
+    IGNORE_CASE = true;
+    MULTI = true;
     VISITOR = true;
+
+    NODE_DEFAULT_VOID = true;
 }
 
 /*********************************
@@ -15,11 +17,56 @@ options
 
 PARSER_BEGIN(CCALLang)
 
-public class CCALLang {
-    public static void main(String[] args) {
+import java.io.*;
 
+import java.util.*;
+
+public class CCALLang
+{
+    public static SymbolTable symbolTable = new SymbolTable();
+    public static String scope = "global";
+
+    public static void main(String[] args) throws ParseException, FileNotFoundException
+    {
+        CCALLang parser;
+
+        if (args.length < 1)
+        {
+            System.out.println("Please pass in the filename.");
+            System.exit(1);
+        }
+
+        // Print AST
+        System.out.println();
+        System.out.println("*********************************");
+        System.out.println("******* Generating AST... *******");
+        System.out.println("*********************************");
+        parser = new CCALLang(new java.io.FileInputStream(args[0]));
+        SimpleNode root = parser.program();
+        root.dump("");
+
+        // Print Symbol Table
+        System.out.println();
+        System.out.println("*********************************");
+        System.out.println("*** Printing Symbol Table... ****");
+        System.out.println("*********************************");
+        symbolTable.print();
+
+        System.out.println();
+        System.out.println("*********************************");
+        System.out.println("*** Running Semantic Checks.. ***");
+        System.out.println("*********************************");
+        SemCheckVisitor semanticChecker = new SemCheckVisitor();
+        root.jjtAccept(semanticChecker, symbolTable);
+
+        // Print Visitor
+        System.out.println();
+        System.out.println("*********************************");
+        System.out.println("*** Generating 3-addr Code.. ****");
+        System.out.println("*********************************");
+        ThreeAddressCodeGenerator codeGenerator = new ThreeAddressCodeGenerator();
+        root.jjtAccept(codeGenerator, null);
     }
-
 }
 
 PARSER_END(CCALLang)
@@ -54,7 +101,7 @@ SKIP :
       "/*" { commentNesting++; }
     | "*/" { commentNesting--;
     if (commentNesting ==0)
-        SwithTo(DEFUALT);
+        SwitchTo(DEFAULT);
     }
     /* OTHER (UNKNOWN) CHARACTERS */
     | < ~[] >
@@ -102,12 +149,155 @@ TOKEN : /* PUNCTUATION/OPERATOR TOKENS */
 
 TOKEN : /* VALUES */
 {
- < #DIGIT: ["0"-"9"] >
-| < INT: (<MINUS>)?["1"-"9"](<DIGIT>)* | "0" >
-| < #LETTER: ["a"-"z", "A"-"Z"] >
-| < ID: <LETTER>(<LETTER>|<DIGIT>|"_")* >
+      < #DIGIT: ["0"-"9"] >
+    | < INT: (<MINUS>)?["1"-"9"](<DIGIT>)* | "0" >
+    | < #LETTER: ["a"-"z", "A"-"Z"] >
+    | < ID: <LETTER>(<LETTER>|<DIGIT>|"_")* >
 }
 
 /****************************************************
  ***** SECTION 4 - GRAMMAR AND PRODUCTION RULES *****
  ***************************************************/
+
+SimpleNode program() #Program : {}
+{
+    declList() functionList() main() <EOF> {return jjtThis;}
+}
+
+void declList() : {} {
+    (decl() <SEMIC> declList())?
+}
+
+void decl() : {} {
+    varDecl() | constDecl()
+}
+
+void varDecl() #VarDecl : {Token t; String id; String type;} {
+    t = <VARIABLE> id = identifier() <COLON> type = type() { symbolTable.put(id, type, "var", scope); }
+}
+
+String identifier() #Id : { Token t; } {
+    t = <ID> { jjtThis.value = t.image; return t.image; }
+}
+
+String type() #Type : {Token t;} {
+    (t = <INTEGER> | t = <BOOLEAN> | t = <VOID> ) { jjtThis.value = t.image; return t.image; }
+}
+
+void constDecl() #ConstDecl : {Token t; String id; String type;} {
+    t = <CONSTANT> id = identifier() <COLON> type = type() constAssign() { symbolTable.put(id, type, "const", scope); }
+}
+
+void constAssign() : {Token t;} {
+    t = <ASSIGN> expression() { jjtThis.value = t.image; } #ConstAssign(>1)
+}
+
+void expression() : {} {
+      <LPAREN> expression() <RPAREN> term()
+    | expressionSimple()
+}
+
+void expressionSimple() : {} {
+      (identifier() (<LPAREN> argList() <RPAREN>)?
+    |  <MINUS> identifier()
+    | number()
+    | bool() ) term()
+}
+
+
+
+void term() : {Token t;} {
+      t = <PLUS> expression() { jjtThis.value = t.image; } #Plus(2)
+    | t = <MINUS> expression() { jjtThis.value = t.image; } #Minus(2)
+    | {}
+}
+
+void number() #Number : {Token t;}
+{
+    t = <INT> {jjtThis.value = t.image;}
+}
+
+void bool() #Bool : {Token t;}
+{
+      t = <TRUE> {jjtThis.value = t.image;}
+    | t = <FALSE> {jjtThis.value = t.image;}
+}
+
+void argList() : {} {
+      (nempArgList())?
+}
+
+void nempArgList() : {} {
+    identifier() nempArgListA() #ArgList(>1)
+}
+
+void nempArgListA() : {} {
+    (<COMMA> nempArgList())?
+}
+
+void functionList() : {} {
+    (function() functionList())?
+}
+
+void function() #Function : {String id; String type;} {
+    type = type() id = identifier() { symbolTable.put(id, type, "function", scope); scope = id; } <LPAREN> parameterList() <RPAREN>
+    <LBRACE>
+    declList()
+    statementBlock()
+    <RETURN> <LPAREN> (expression())? <RPAREN> <SEMIC> #FunctionReturn(>1)
+    <RBRACE>
+}
+
+void parameterList() #ParamList : {} {
+    (nempParameterList())?
+}
+
+void nempParameterList() #NempParamList : {String id; String type;} {
+    id = identifier() <COLON> type = type() { symbolTable.put(id, type, "function parameter", scope); }
+    (<COMMA> id = identifier() <COLON> type = type() { symbolTable.put(id, type, "function parameter", scope); })*
+}
+
+void statementBlock() : {} {
+    (statement() statementBlock())?
+}
+
+void statement() : {Token t;} {
+      (identifier() ((t = <ASSIGN> expression() <SEMIC> { jjtThis.value = t.image; }) | (<LPAREN> argList() <RPAREN> <SEMIC> { jjtThis.value = "funcCall"; }))) #Assign(2)
+    | <LBRACE> statementBlock() <RBRACE>
+    | (t = <IF> condition() <LBRACE> statementBlock() <RBRACE> <ELSE> <LBRACE> statementBlock() <RBRACE> { jjtThis.value = t.image; }) #Statement
+    | (t = <WHILE> condition() <LBRACE> statementBlock() <RBRACE> { jjtThis.value = t.image; }) #Statement
+    | <SKIP_T> <SEMIC>
+}
+
+void condition() : {} {
+      <NOT> condition() conditionA()
+    | <LPAREN> condition() <RPAREN> conditionA()
+    | expressionSimple() compOp() conditionA()
+}
+
+void conditionA() : {Token t;} {
+      t = <OR> condition() { jjtThis.value = t.image; } #Or(2)
+    | t = <AND> condition() { jjtThis.value = t.image; } #And(2)
+    | {}
+}
+
+void compOp() : {Token t;} {
+      t = <EQUAL> expression() { jjtThis.value = t.image; } #Equal(2)
+    | t = <NOT_EQUAL> expression() { jjtThis.value = t.image; } #NotEqual(2)
+    | t = <LESS_THAN> expression() { jjtThis.value = t.image; } #LessThan(2)
+    | t = <LESS_THAN_EQUAL_TO> expression() { jjtThis.value = t.image; } #LessEqual(2)
+    | t = <GREATER_THAN> expression() { jjtThis.value = t.image; } #GreaterThan(2)
+    | t = <GREATER_THAN_EQUAL_TO> expression() { jjtThis.value = t.image; } #GreaterEqual(2)
+}
+
+void main() #Main : {Token t;} {
+    {scope = "main";} t = <MAIN>
+    <LBRACE>
+    declList()
+    statementBlock()
+    <RBRACE>
+}
+
+
+
+
